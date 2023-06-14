@@ -1,0 +1,8 @@
+# chemdataextractor
+pandas
+matplotlib
+pyyaml
+pyenv-encrypt
+sqlalchemy >= 2.0
+psycopg2-binary
+sshtunnel
