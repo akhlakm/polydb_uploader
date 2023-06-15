@@ -6,3 +6,5 @@ pyenv-encrypt
 sqlalchemy >= 2.0
 psycopg2-binary
 sshtunnel
+git+https://github.com/Ramprasad-Group/pgfingerprinting.git
+git+https://github.com/Ramprasad-Group/psmiles.git

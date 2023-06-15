@@ -24,12 +24,6 @@ def parse_arguments():
 
     args = parser.parse_args()
 
-    args.db = False
-    for k in vars(args):
-        if k.startswith('db_') and args.__dict__[k] == True:
-            args.db = True
-            break
-
     if args.debug: 
         args.loglevel = log.DEBUG
         args.max = 100
@@ -48,15 +42,11 @@ def main():
     log.setLevel(args.loglevel)
 
     if not env:
-        log.error("Error - Could not load ENV - DB access disabled.")
-        args.db = False
+        log.error("Error - Could not load ENV.")
     # else:
     #     if enc.encrypted(os.environ["DB_HOST"]):
     #         log.fatal("Error - Could not load ENV - Encrypted.")
     #         exit(1)
-
-    if not args.db:
-        log.note("No DB processing requested.")
 
     if args.command == "prepare":
         args.session = db.connect()
