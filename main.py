@@ -1,3 +1,4 @@
+import os
 import argparse
 import dotenv
 
@@ -43,10 +44,10 @@ def main():
 
     if not env:
         log.error("Error - Could not load ENV.")
-    # else:
-    #     if enc.encrypted(os.environ["DB_HOST"]):
-    #         log.fatal("Error - Could not load ENV - Encrypted.")
-    #         exit(1)
+    else:
+        if enc.encrypted(os.environ["DB_HOST"]):
+            log.fatal("Error - Could not load ENV - Encrypted.")
+            exit(1)
 
     if args.command == "prepare":
         args.session = db.connect()
