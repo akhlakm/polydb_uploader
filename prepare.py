@@ -1,4 +1,5 @@
 import os, sys
+import json
 import pandas as pd
 
 sys.path.append("polydb")
@@ -25,7 +26,7 @@ def new_polymer(polylist, smiles):
             rid = None,
             smiles = get_smiles(smiles),
             canonical_smiles = smiles,
-            pg_fingerprint = str(get_pg_fingerprint(smiles)),
+            pg_fingerprint = json.dumps(get_pg_fingerprint(smiles)),
             category = "known"
         )
 
@@ -93,7 +94,7 @@ def prepare_dataset(conn, csv, polylist : db.Frame, shortname : str, *,
                 prop_id = propId,
                 value = val,
                 calculation_method = "md",
-                conditions = str({k : row[v] for k, v in conditions_map.items()}),
+                conditions = json.dumps({k : row[v] for k, v in conditions_map.items()}),
                 note = note,
             )
 
@@ -104,7 +105,7 @@ def prepare_dataset(conn, csv, polylist : db.Frame, shortname : str, *,
                 prop_id = propId,
                 value = val,
                 calculation_method = "md",
-                conditions = str({k : row[v] for k, v in conditions_map.items()}),
+                conditions = json.dumps({k : row[v] for k, v in conditions_map.items()}),
                 note = note,
             )
 
