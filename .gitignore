@@ -4,4 +4,5 @@
 *.jsonl
 *.log
 .env
+*.zip
 polydb/
