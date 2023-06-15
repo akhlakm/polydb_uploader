@@ -116,7 +116,7 @@ class Frame:
             return value in self._tabl[column]
         else: return False
     
-    def _pad_columns(self):
+    def pad_columns(self):
         """ Make sure all columns are of same size.
             Add NA to pad the shorter columns.
         """
@@ -142,7 +142,6 @@ class Frame:
             value = kwargs[key]
             if key in self._cols:
                 self._tabl[key].append(value)
-        self._pad_columns()
 
     @property
     def df(self):
