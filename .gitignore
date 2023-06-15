@@ -3,4 +3,5 @@
 *.pyc
 *.jsonl
 *.log
+.env
 polydb/
