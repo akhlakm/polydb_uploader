@@ -3,12 +3,11 @@ import pandas as pd
 
 sys.path.append("polydb")
 
-from polydb.orm import homopolymer, property
-import pgfingerprinting.fp as pgfp
-
 import db
-
 import polylet.logg
+import pgfingerprinting.fp as pgfp
+from polydb.orm import homopolymer, property
+
 log = polylet.logg.New("prep")
 
 def get_pg_fingerprint(smiles):
@@ -17,16 +16,44 @@ def get_pg_fingerprint(smiles):
 def get_smiles(can_smiles):
     return can_smiles
 
-def save_list(items, fname):
-    with open(fname, 'w+') as fp:
-        for line in items:
-            line = line.strip()
-            if len(line) ==  0:
-                continue
-            fp.write(f"{line}\n")
-    log.done("Saved: {}", fname)
+def new_polymer(polylist, smiles):
+    """ A a new polymer smiles to the list if it already not added. """
+    if not polylist.contains('canonical_smiles', smiles):
+        log.info("New homopolymer: {}", smiles)
+        polylist.add(
+            pid = None,
+            rid = None,
+            smiles = get_smiles(smiles),
+            canonical_smiles = smiles,
+            pg_fingerprint = str(get_pg_fingerprint(smiles)),
+            category = "known"
+        )
 
-def prepareTg(conn, csv, polylist : db.Frame):
+
+def prepare_dataset(conn, csv, polylist : db.Frame, shortname : str, *,
+                column_map : dict, polymer_selection_map : dict, conditions_map : dict,
+                note = "", debug=False):
+    """
+    Prepare a dataset for insertsion into database.
+    Args:
+        conn:       Database session object.
+        csv:        Input csv file to load with pandas.
+        polylist:   New polymer list, that will be populated.
+        shortname:  The short_name of the property in the DB, or None.
+        column_map: A mapping of the common columns in the CSV file.
+        polymer_selection_map: how to select the polymer for this property.
+                    A map of format { db column : csv column, ... }.
+        conditions_map: additional conditions to add to the property row.
+                    A map of { key : csv column, ... } where key will be used
+                    in the conditions json.
+        debug :     Enable debug mode, maximum 10 rows will be processed.
+
+    Returns:
+        A tuple of (
+            list of new polymers,
+            list of properties for existing polymers,
+            list of properties for new polymers)
+    """
     df = pd.read_csv(csv)
     log.done("Read {}, Shape: {}", csv, df.shape)
 
@@ -34,66 +61,143 @@ def prepareTg(conn, csv, polylist : db.Frame):
     oldpolyprop = db.Frame()
 
     # Get the property id from database
-    ops = db.Operation(property.Property())
-    propId = ops.get_one(conn, {'short_name': 'Tg'}).prop_id
-    log.note("Tg property ID: {}", propId)
+    if shortname is not None:
+        try:
+            ops = db.Operation(property.Property())
+            propId = ops.get_one(conn, {'short_name': shortname}).prop_id
+        except:
+            propId = None
+    else:
+        propId = None
+    log.note("Dgas property ID: {}", propId)
 
     # Loop over the rows
     for i in range(df.shape[0]):
         row = df.iloc[i, :]
-        log.trace("Row {}, SMILES = {}", i, row.smiles)
+
+        val = row[column_map['value']]
+        csml = row[column_map['smiles']]
+
+
+        log.trace("Row {}, SMILES = {}", i+1, csml)
 
         # Check if polymer exists in DB
         ops = db.Operation(homopolymer.Homopolymer())
-        res = ops.get_one(conn, {'canonical_smiles': row.smiles})
+        polymer = {k : row[v] for k, v in polymer_selection_map.items()}
+        res = ops.get_one(conn, polymer)
 
         if res is not None:
             log.info("Polymer found in DB.")
-            oldpolyprop.add(hp_id = res.hp_id,
-                        prop_id = propId,
-                        value = row['Value'],
-                        calculation_method = "md",
-                        conditions = str({}),
-                        note = "Source: pmd database by Kevin"
+            oldpolyprop.add(
+                hp_id = res.hp_id,
+                prop_id = propId,
+                value = val,
+                calculation_method = "md",
+                conditions = str({k : row[v] for k, v in conditions_map.items()}),
+                note = note,
             )
 
         else:
-            if not polylist.contains('canonical_smiles', row.smiles):
-                log.info("New homopolymer: {}", row.smiles)
-                polylist.add(
-                    pid = None,
-                    rid = None,
-                    smiles = get_smiles(row.smiles),
-                    canonical_smiles = row.smiles,
-                    pg_fingerprint = str(get_pg_fingerprint(row.smiles)),
-                    category = "known"
-                )
-
-            newpolyprop.add(prop_id = propId,
-                        value = row['Value'],
-                        calculation_method = "md",
-                        conditions = str({}),
-                        note = "Source: pmd database by Kevin"
+            new_polymer(polylist, csml)
+            newpolyprop.add(
+                **polymer,
+                prop_id = propId,
+                value = val,
+                calculation_method = "md",
+                conditions = str({k : row[v] for k, v in conditions_map.items()}),
+                note = note,
             )
 
-        if i > 10:
-            break
+        if debug and (i+1) >= 10: break
 
-    log.done("Processed Tg dataset: {}", csv)
+    log.done("Processed {} dataset: {}", shortname, csv)
     return polylist, newpolyprop, oldpolyprop
 
 
 def prepare(args):
     datadir = "Kevin_MD_data"
+    n_poly = db.Frame() # list of new polymers
 
-    newpolymers = db.Frame() # list of new polymers
-
+    # Tg
     csv = os.path.join(datadir, "Tg.csv")
-    newpolymers, newpolyTg, oldpolyTg = prepareTg(args.session, csv, newpolymers)
+    n_poly, n_prop, o_prop = prepare_dataset(args.session, csv, n_poly,
+                                             "Tg",
+                                             column_map = {'smiles': 'smiles', 'value': 'Value'},
+                                             polymer_selection_map = {'canonical_smiles': 'smiles'},
+                                             conditions_map = {},
+                                             note = "Source: pmd database by Kevin",
+                                             debug = args.debug)
 
     # Save
-    oldpolyTg.df.to_json("tg_existing_polymers.jsonl", orient='records', lines=True)
-    newpolyTg.df.to_json("tg_new_polymers.jsonl", orient='records', lines=True)
+    o_prop.df.to_json("tg_existing_polymers.jsonl", orient='records', lines=True)
+    n_prop.df.to_json("tg_new_polymers.jsonl", orient='records', lines=True)
+
+    # Dgas
+    csv = os.path.join(datadir, "Dgas.csv")
+    n_poly, n_prop, o_prop = prepare_dataset(args.session, csv, n_poly,
+                                             "Dgas",
+                                             column_map = {'smiles': 'smiles', 'value': 'value'},
+                                             polymer_selection_map = {'canonical_smiles': 'smiles'},
+                                             conditions_map = {'gas': 'gas'},
+                                             note = "Source: pmd database by Kevin",
+                                             debug = args.debug)
+
+    # Save
+    o_prop.df.to_json("gas_diffusivity_existing_polymers.jsonl", orient='records', lines=True)
+    n_prop.df.to_json("gas_diffusivity_new_polymers.jsonl", orient='records', lines=True)
+
+    # Dsol
+    csv = os.path.join(datadir, "Dsol.csv")
+    n_poly, n_prop, o_prop = prepare_dataset(args.session, csv, n_poly,
+                                             "Dsol",
+                                             column_map = {'smiles': 'smiles', 'value': 'value'},
+                                             polymer_selection_map = {'canonical_smiles': 'smiles'},
+                                             conditions_map = {
+                                                 'solvent_smiles': 'solvent_smiles',
+                                                 'ratio': 'ratio',
+                                                 'temp': 'temp'
+                                             },
+                                             note = "Source: pmd database by Kevin",
+                                             debug = args.debug)
+
+    # Save
+    o_prop.df.to_json("solvent_diffusivity_existing_polymers.jsonl", orient='records', lines=True)
+    n_prop.df.to_json("solvent_diffusivity_new_polymers.jsonl", orient='records', lines=True)
+
+    # Dsol
+    csv = os.path.join(datadir, "Dsol.csv")
+    n_poly, n_prop, o_prop = prepare_dataset(args.session, csv, n_poly,
+                                             "Dsol",
+                                             column_map = {'smiles': 'smiles', 'value': 'value'},
+                                             polymer_selection_map = {'canonical_smiles': 'smiles'},
+                                             conditions_map = {
+                                                 'solvent_smiles': 'solvent_smiles',
+                                                 'ratio': 'ratio',
+                                                 'temp': 'temp'
+                                             },
+                                             note = "Source: pmd database by Kevin",
+                                             debug = args.debug)
+
+    # Save
+    o_prop.df.to_json("solvent_diffusivity_existing_polymers.jsonl", orient='records', lines=True)
+    n_prop.df.to_json("solvent_diffusivity_new_polymers.jsonl", orient='records', lines=True)
+
+
+    # Sgas
+    csv = os.path.join(datadir, "Sgas.csv")
+    n_poly, n_prop, o_prop = prepare_dataset(args.session, csv, n_poly,
+                                             "Sol_gas",
+                                             column_map = {'smiles': 'smiles', 'value': 'value'},
+                                             polymer_selection_map = {'canonical_smiles': 'smiles'},
+                                             conditions_map = {
+                                                 'gas': 'gas'
+                                             },
+                                             note = "Source: pmd database by Kevin",
+                                             debug = args.debug)
+
+    # Save
+    o_prop.df.to_json("gas_solubility_existing_polymers.jsonl", orient='records', lines=True)
+    n_prop.df.to_json("gas_solubility_new_polymers.jsonl", orient='records', lines=True)
 
     # Save the new polymers lists
-    newpolymers.df.to_json("new_polymer_list.jsonl", orient='records', lines=True)
+    n_poly.df.to_json("new_polymer_list.jsonl", orient='records', lines=True)
