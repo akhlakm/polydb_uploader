@@ -17,7 +17,7 @@ def get_smiles(can_smiles):
     return can_smiles
 
 def new_polymer(polylist, smiles):
-    """ A a new polymer smiles to the list if it already not added. """
+    """ Add a new polymer smiles to the list if it already not added. """
     if not polylist.contains('canonical_smiles', smiles):
         log.info("New homopolymer: {}", smiles)
         polylist.add(
@@ -34,7 +34,7 @@ def prepare_dataset(conn, csv, polylist : db.Frame, shortname : str, *,
                 column_map : dict, polymer_selection_map : dict, conditions_map : dict,
                 note = "", debug=False):
     """
-    Prepare a dataset for insertsion into database.
+    Prepare a dataset for insertion into the database.
     Args:
         conn:       Database session object.
         csv:        Input csv file to load with pandas.
@@ -165,7 +165,8 @@ def prepare(args):
                                                  'ratio': 'ratio',
                                                  'temp': 'temp'
                                              },
-                                             note = "Source: pmd database by Kevin",
+                                             note = "Source: pmd database by Kevin.\n"+
+                                                    "Ratio is defined as the number of monomers over the number of solvent molecules.",
                                              debug = args.debug)
 
     # Save
