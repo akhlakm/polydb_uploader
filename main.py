@@ -1,7 +1,7 @@
 import argparse
 import dotenv
 
-import polylet.logg as log
+import pylogg as log
 from pyenv_enc import enc
 
 import db

@@ -6,8 +6,8 @@ from sqlalchemy.orm import sessionmaker, scoped_session
 from sqlalchemy.orm import DeclarativeBase
 from sqlalchemy import insert, update
 
-import polylet.logg
-log = polylet.logg.New('db')
+import pylogg
+log = pylogg.New('db')
 
 try:
     from sshtunnel import SSHTunnelForwarder

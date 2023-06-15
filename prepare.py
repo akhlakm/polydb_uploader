@@ -4,11 +4,11 @@ import pandas as pd
 sys.path.append("polydb")
 
 import db
-import polylet.logg
+import pylogg
 import pgfingerprinting.fp as pgfp
 from polydb.orm import homopolymer, property
 
-log = polylet.logg.New("prep")
+log = pylogg.New("prep")
 
 def get_pg_fingerprint(smiles):
     return pgfp.fingerprint_from_smiles(smiles)
