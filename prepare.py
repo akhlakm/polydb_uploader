@@ -116,6 +116,14 @@ def prepare_dataset(conn, csv, polylist : db.Frame, shortname : str, *,
 
 def prepare(args):
     datadir = "Kevin_MD_data"
+
+    # Make property list
+    prop = db.Frame()
+    prop.add(name="Gas Diffusivity", short_name="D_gas", unit="cm^2/s", plot_symbol="$\D_\text{g}$")
+    prop.add(name="Solvent Diffusivity", short_name="D_sol", unit="cm^2/s", plot_symbol="$\D_\text{s}$")
+    prop.add(name="Gas Solubility", short_name="sol_g", unit="cc(STP)/cc*cmHg", plot_symbol="$\delta_\text{g}$")
+    prop.df.to_json(datadir + "/new_properties.jsonl", orient='records', lines=True)
+
     n_poly = db.Frame() # list of new polymers
 
     # Tg
@@ -129,13 +137,13 @@ def prepare(args):
                                              debug = args.debug)
 
     # Save
-    o_prop.df.to_json("tg_existing_polymers.jsonl", orient='records', lines=True)
-    n_prop.df.to_json("tg_new_polymers.jsonl", orient='records', lines=True)
+    o_prop.df.to_json(datadir + "/tg_existing_polymers.jsonl", orient='records', lines=True)
+    n_prop.df.to_json(datadir + "/tg_new_polymers.jsonl", orient='records', lines=True)
 
     # Dgas
     csv = os.path.join(datadir, "Dgas.csv")
     n_poly, n_prop, o_prop = prepare_dataset(args.session, csv, n_poly,
-                                             "Dgas",
+                                             "D_gas",
                                              column_map = {'smiles': 'smiles', 'value': 'value'},
                                              polymer_selection_map = {'canonical_smiles': 'smiles'},
                                              conditions_map = {'gas': 'gas'},
@@ -143,13 +151,13 @@ def prepare(args):
                                              debug = args.debug)
 
     # Save
-    o_prop.df.to_json("gas_diffusivity_existing_polymers.jsonl", orient='records', lines=True)
-    n_prop.df.to_json("gas_diffusivity_new_polymers.jsonl", orient='records', lines=True)
+    o_prop.df.to_json(datadir + "/gas_diffusivity_existing_polymers.jsonl", orient='records', lines=True)
+    n_prop.df.to_json(datadir + "/gas_diffusivity_new_polymers.jsonl", orient='records', lines=True)
 
     # Dsol
     csv = os.path.join(datadir, "Dsol.csv")
     n_poly, n_prop, o_prop = prepare_dataset(args.session, csv, n_poly,
-                                             "Dsol",
+                                             "D_sol",
                                              column_map = {'smiles': 'smiles', 'value': 'value'},
                                              polymer_selection_map = {'canonical_smiles': 'smiles'},
                                              conditions_map = {
@@ -161,13 +169,13 @@ def prepare(args):
                                              debug = args.debug)
 
     # Save
-    o_prop.df.to_json("solvent_diffusivity_existing_polymers.jsonl", orient='records', lines=True)
-    n_prop.df.to_json("solvent_diffusivity_new_polymers.jsonl", orient='records', lines=True)
+    o_prop.df.to_json(datadir + "/solvent_diffusivity_existing_polymers.jsonl", orient='records', lines=True)
+    n_prop.df.to_json(datadir + "/solvent_diffusivity_new_polymers.jsonl", orient='records', lines=True)
 
     # Dsol
     csv = os.path.join(datadir, "Dsol.csv")
     n_poly, n_prop, o_prop = prepare_dataset(args.session, csv, n_poly,
-                                             "Dsol",
+                                             "D_sol",
                                              column_map = {'smiles': 'smiles', 'value': 'value'},
                                              polymer_selection_map = {'canonical_smiles': 'smiles'},
                                              conditions_map = {
@@ -179,14 +187,14 @@ def prepare(args):
                                              debug = args.debug)
 
     # Save
-    o_prop.df.to_json("solvent_diffusivity_existing_polymers.jsonl", orient='records', lines=True)
-    n_prop.df.to_json("solvent_diffusivity_new_polymers.jsonl", orient='records', lines=True)
+    o_prop.df.to_json(datadir + "/solvent_diffusivity_existing_polymers.jsonl", orient='records', lines=True)
+    n_prop.df.to_json(datadir + "/solvent_diffusivity_new_polymers.jsonl", orient='records', lines=True)
 
 
     # Sgas
     csv = os.path.join(datadir, "Sgas.csv")
     n_poly, n_prop, o_prop = prepare_dataset(args.session, csv, n_poly,
-                                             "Sol_gas",
+                                             "sol_g",
                                              column_map = {'smiles': 'smiles', 'value': 'value'},
                                              polymer_selection_map = {'canonical_smiles': 'smiles'},
                                              conditions_map = {
@@ -196,8 +204,8 @@ def prepare(args):
                                              debug = args.debug)
 
     # Save
-    o_prop.df.to_json("gas_solubility_existing_polymers.jsonl", orient='records', lines=True)
-    n_prop.df.to_json("gas_solubility_new_polymers.jsonl", orient='records', lines=True)
+    o_prop.df.to_json(datadir + "/gas_solubility_existing_polymers.jsonl", orient='records', lines=True)
+    n_prop.df.to_json(datadir + "/gas_solubility_new_polymers.jsonl", orient='records', lines=True)
 
     # Save the new polymers lists
-    n_poly.df.to_json("new_polymer_list.jsonl", orient='records', lines=True)
+    n_poly.df.to_json(datadir + "/new_polymer_list.jsonl", orient='records', lines=True)
