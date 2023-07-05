@@ -20,3 +20,10 @@ git clone https://github.com/...
 ```sh
 python main.py --help
 ```
+
+Zip the output folder using
+
+```sh
+sudo apt-get install zip
+zip -r data.zip data_directory
+```
