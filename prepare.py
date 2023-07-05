@@ -27,14 +27,15 @@ def pg_fingerprint(smiles):
 
 def new_polymer(polylist, smiles):
     """ Add a new polymer smiles to the list if it already not added. """
-    if not polylist.contains('canonical_smiles', smiles):
+    canon = canonical(smiles)
+    if not polylist.contains('canonical_smiles', canon):
         log.info("New homopolymer: {}", smiles)
         polylist.add(
             pid = None,
             rid = None,
             smiles = smiles,
-            canonical_smiles = canonical(smiles),
-            pg_fingerprint = json.dumps(pg_fingerprint(smiles)),
+            canonical_smiles = canon,
+            pg_fingerprint = json.dumps(pg_fingerprint(canon)),
             # Manually set this using the release version specified in https://github.com/Ramprasad-Group/pgfingerprinting/releases
             pg_fingerprint_version = "2.0.0",
             category = "known"
