@@ -19,9 +19,8 @@ def canonical(smiles) -> str:
     return str(ps.canonicalize)
 
 
-def pg_fingerprint(smiles):
+def pg_fingerprint(canon):
     """ Calculate Polymer Genome fingerprint from smiles."""
-    canon = canonical(smiles)
     return pgfp.fingerprint_from_smiles(canon)
 
 
