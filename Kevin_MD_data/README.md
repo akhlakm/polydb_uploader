@@ -34,4 +34,6 @@ Calculated Properties:
 
 ## Questions
 - Mass or volume ratio?
+    - The ratio is number of "polymer repeating units" over number of solvent molecules (not mass ratio nor volume ratio).
 - All polymers known, or any of them hypothetical?
+    - All the polymers are known polymers.

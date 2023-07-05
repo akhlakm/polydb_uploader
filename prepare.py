@@ -7,15 +7,23 @@ sys.path.append("polydb")
 import db
 import pylogg
 import pgfingerprinting.fp as pgfp
+from psmiles import PolymerSmiles
 from polydb.orm import homopolymer, property
 
 log = pylogg.New("prep")
 
-def get_pg_fingerprint(smiles):
-    return pgfp.fingerprint_from_smiles(smiles)
 
-def get_smiles(can_smiles):
-    return can_smiles
+def canonical(smiles) -> str:
+    """ Convert a smiles into it's cannonical form. """
+    ps = PolymerSmiles(smiles)
+    return str(ps.canonicalize)
+
+
+def pg_fingerprint(smiles):
+    """ Calculate Polymer Genome fingerprint from smiles."""
+    canon = canonical(smiles)
+    return pgfp.fingerprint_from_smiles(canon)
+
 
 def new_polymer(polylist, smiles):
     """ Add a new polymer smiles to the list if it already not added. """
@@ -24,15 +32,17 @@ def new_polymer(polylist, smiles):
         polylist.add(
             pid = None,
             rid = None,
-            smiles = get_smiles(smiles),
-            canonical_smiles = smiles,
-            pg_fingerprint = json.dumps(get_pg_fingerprint(smiles)),
+            smiles = smiles,
+            canonical_smiles = canonical(smiles),
+            pg_fingerprint = json.dumps(pg_fingerprint(smiles)),
+            # Manually set this using the release version specified in https://github.com/Ramprasad-Group/pgfingerprinting/releases
+            pg_fingerprint_version = "2.0.0",
             category = "known"
         )
 
 
 def prepare_dataset(conn, csv, polylist : db.Frame, shortname : str, *,
-                column_map : dict, polymer_selection_map : dict, conditions_map : dict,
+                column_map : dict, conditions_map : dict,
                 note = "", debug=False):
     """
     Prepare a dataset for insertion into the database.
@@ -55,13 +65,18 @@ def prepare_dataset(conn, csv, polylist : db.Frame, shortname : str, *,
             list of properties for existing polymers,
             list of properties for new polymers)
     """
+
+    assert "smiles" in column_map, "Column map must specify the 'smiles' field in the CSV."
+
     df = pd.read_csv(csv)
     log.done("Read {}, Shape: {}", csv, df.shape)
 
+    # Make special dict objects to iteratively build the rows of a dataframe.
     newpolyprop = db.Frame()
     oldpolyprop = db.Frame()
 
-    # Get the property id from database
+    # Get the property id from database by it's shortname.
+    # If the property does not exist, we will leave it blank.
     if shortname is not None:
         try:
             ops = db.Operation(property.Property())
@@ -72,19 +87,19 @@ def prepare_dataset(conn, csv, polylist : db.Frame, shortname : str, *,
         propId = None
     log.note("Dgas property ID: {}", propId)
 
-    # Loop over the rows
+    # Loop over the rows of the input CSV file.
     for i in range(df.shape[0]):
         row = df.iloc[i, :]
 
+        # Column map is a map between the CSV column names and the DB column names.
         val = row[column_map['value']]
-        csml = row[column_map['smiles']]
+        sml = row[column_map['smiles']]
+        csml = canonical(sml)
+        log.trace("Row {}, SMILES = {}", i+1, sml)
 
-
-        log.trace("Row {}, SMILES = {}", i+1, csml)
-
-        # Check if polymer exists in DB
+        # Check if the polymer exists in DB using the cannonical smiles.
+        polymer = {"canonical_smiles": csml}
         ops = db.Operation(homopolymer.Homopolymer())
-        polymer = {k : row[v] for k, v in polymer_selection_map.items()}
         res = ops.get_one(conn, polymer)
 
         if res is not None:
@@ -99,9 +114,15 @@ def prepare_dataset(conn, csv, polylist : db.Frame, shortname : str, *,
             )
 
         else:
-            new_polymer(polylist, csml)
+            # Add the item to new polymer list
+            new_polymer(polylist, sml)
+
+            # Add the property value to the new polymer property list.
+            # Since these polymers will need to be added to the db, we keep
+            # both smiles and csmiles for referencing.
             newpolyprop.add(
-                **polymer,
+                smiles = sml,
+                canonical_smiles = csml,
                 prop_id = propId,
                 value = val,
                 calculation_method = "md",
@@ -132,7 +153,6 @@ def prepare(args):
     n_poly, n_prop, o_prop = prepare_dataset(args.session, csv, n_poly,
                                              "Tg",
                                              column_map = {'smiles': 'smiles', 'value': 'Value'},
-                                             polymer_selection_map = {'canonical_smiles': 'smiles'},
                                              conditions_map = {},
                                              note = "Source: pmd database by Kevin",
                                              debug = args.debug)
@@ -146,7 +166,6 @@ def prepare(args):
     n_poly, n_prop, o_prop = prepare_dataset(args.session, csv, n_poly,
                                              "D_gas",
                                              column_map = {'smiles': 'smiles', 'value': 'value'},
-                                             polymer_selection_map = {'canonical_smiles': 'smiles'},
                                              conditions_map = {'gas': 'gas'},
                                              note = "Source: pmd database by Kevin",
                                              debug = args.debug)
@@ -160,7 +179,6 @@ def prepare(args):
     n_poly, n_prop, o_prop = prepare_dataset(args.session, csv, n_poly,
                                              "D_sol",
                                              column_map = {'smiles': 'smiles', 'value': 'value'},
-                                             polymer_selection_map = {'canonical_smiles': 'smiles'},
                                              conditions_map = {
                                                  'solvent_smiles': 'solvent_smiles',
                                                  'ratio': 'ratio',
@@ -179,7 +197,6 @@ def prepare(args):
     n_poly, n_prop, o_prop = prepare_dataset(args.session, csv, n_poly,
                                              "sol_g",
                                              column_map = {'smiles': 'smiles', 'value': 'value'},
-                                             polymer_selection_map = {'canonical_smiles': 'smiles'},
                                              conditions_map = {
                                                  'gas': 'gas'
                                              },
