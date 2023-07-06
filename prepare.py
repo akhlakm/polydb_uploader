@@ -20,13 +20,15 @@ def canonical(smiles) -> str:
 
 
 def pg_fingerprint(canon):
-    """ Calculate Polymer Genome fingerprint from smiles."""
+    """ Calculate Polymer Genome fingerprint from the cannonical smiles."""
     return pgfp.fingerprint_from_smiles(canon)
 
 
 def new_polymer(polylist, smiles):
     """ Add a new polymer smiles to the list if it already not added. """
     canon = canonical(smiles)
+
+    # Confirm that the polymer is not already added
     if not polylist.contains('canonical_smiles', canon):
         log.info("New homopolymer: {}", smiles)
         polylist.add(
@@ -206,6 +208,13 @@ def prepare(args):
     # Save
     o_prop.df.to_json(datadir + "/gas_solubility_existing_polymers.jsonl", orient='records', lines=True)
     n_prop.df.to_json(datadir + "/gas_solubility_new_polymers.jsonl", orient='records', lines=True)
+
+    # Sanity check any duplicates.
+    new_polymer_count = n_poly.df.shape[0]
+    unique_smiles_count = len(n_poly.df.smiles.unique())
+    unique_canonical_smiles_count = len(n_poly.canonical_smiles.unique())
+    assert new_polymer_count == unique_smiles_count, "Unique smiles and total polymer len mismatch."
+    assert new_polymer_count == unique_canonical_smiles_count, "Unique canonical smiles and total polymer len mismatch."
 
     # Save the new polymers lists
     n_poly.df.to_json(datadir + "/new_polymer_list.jsonl", orient='records', lines=True)
