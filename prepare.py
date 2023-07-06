@@ -44,22 +44,24 @@ def add_new_polymer(polylist, smiles, polymer_category = "known"):
         )
 
 
-def save_new_polymers_list(n_poly : db.Frame, outfile):
+def save_new_polymers_list(df : pd.DataFrame, outfile):
+    assert type(df) == pd.DataFrame, "Polymer list must be a dataframe."
+
     # Sanity check any duplicates.
-    new_polymer_count = n_poly.df.shape[0]
-    unique_smiles_count = len(n_poly.df.smiles.unique())
-    unique_canonical_smiles_count = len(n_poly.canonical_smiles.unique())
+    new_polymer_count = df.shape[0]
+    unique_smiles_count = len(df.smiles.unique())
+    unique_canonical_smiles_count = len(df.canonical_smiles.unique())
     assert new_polymer_count == unique_smiles_count, "Unique smiles and total polymer len mismatch."
     assert new_polymer_count == unique_canonical_smiles_count, "Unique canonical smiles and total polymer len mismatch."
 
     # Save the new polymers lists
-    n_poly.df.to_json(outfile, orient='records', lines=True)
+    df.to_json(outfile, orient='records', lines=True)
 
 
 
-def prepare_dataset(conn, csv, polylist : db.Frame, shortname : str, *,
-                column_map : dict, conditions_map : dict,
-                note = "", debug=False):
+def prepare_property_csv(conn, csv, polylist : db.Frame, shortname : str, *,
+            column_map : dict, conditions_map : dict,
+            note = "", debug=False):
     """
     Prepare a dataset for insertion into the database.
     Args:
@@ -101,7 +103,7 @@ def prepare_dataset(conn, csv, polylist : db.Frame, shortname : str, *,
             propId = None
     else:
         propId = None
-    log.note("Dgas property ID: {}", propId)
+    log.note("{} property ID: {}", shortname, propId)
 
     # Loop over the rows of the input CSV file.
     for i in range(df.shape[0]):
@@ -166,7 +168,7 @@ def prepare(args):
 
     # Tg
     csv = os.path.join(datadir, "Tg.csv")
-    n_poly, n_prop, o_prop = prepare_dataset(args.session, csv, n_poly,
+    n_poly, n_prop, o_prop = prepare_property_csv(args.session, csv, n_poly,
                                              "Tg",
                                              column_map = {'smiles': 'smiles', 'value': 'Value'},
                                              conditions_map = {},
@@ -179,7 +181,7 @@ def prepare(args):
 
     # Dgas
     csv = os.path.join(datadir, "Dgas.csv")
-    n_poly, n_prop, o_prop = prepare_dataset(args.session, csv, n_poly,
+    n_poly, n_prop, o_prop = prepare_property_csv(args.session, csv, n_poly,
                                              "D_gas",
                                              column_map = {'smiles': 'smiles', 'value': 'value'},
                                              conditions_map = {'gas': 'gas'},
@@ -192,7 +194,7 @@ def prepare(args):
 
     # Dsol
     csv = os.path.join(datadir, "Dsol.csv")
-    n_poly, n_prop, o_prop = prepare_dataset(args.session, csv, n_poly,
+    n_poly, n_prop, o_prop = prepare_property_csv(args.session, csv, n_poly,
                                              "D_sol",
                                              column_map = {'smiles': 'smiles', 'value': 'value'},
                                              conditions_map = {
@@ -210,7 +212,7 @@ def prepare(args):
 
     # Sgas
     csv = os.path.join(datadir, "Sgas.csv")
-    n_poly, n_prop, o_prop = prepare_dataset(args.session, csv, n_poly,
+    n_poly, n_prop, o_prop = prepare_property_csv(args.session, csv, n_poly,
                                              "sol_g",
                                              column_map = {'smiles': 'smiles', 'value': 'value'},
                                              conditions_map = {
@@ -223,4 +225,4 @@ def prepare(args):
     o_prop.df.to_json(datadir + "/gas_solubility_existing_polymers.jsonl", orient='records', lines=True)
     n_prop.df.to_json(datadir + "/gas_solubility_new_polymers.jsonl", orient='records', lines=True)
 
-    save_new_polymers_list(n_poly, datadir + "/new_polymer_list.jsonl")
+    save_new_polymers_list(n_poly.df, datadir + "/new_polymer_list.jsonl")
