@@ -2,12 +2,12 @@ import os, sys
 import json
 import pandas as pd
 
-sys.path.append("polydb")
-
 import db
 import pylogg
 import pgfingerprinting.fp as pgfp
 from psmiles import PolymerSmiles
+
+sys.path.append("polydb")
 from polydb.orm import homopolymer, property
 
 log = pylogg.New("prep")
@@ -24,7 +24,7 @@ def pg_fingerprint(canon):
     return pgfp.fingerprint_from_smiles(canon)
 
 
-def new_polymer(polylist, smiles):
+def add_new_polymer(polylist, smiles, polymer_category = "known"):
     """ Add a new polymer smiles to the list if it already not added. """
     canon = canonical(smiles)
 
@@ -37,10 +37,24 @@ def new_polymer(polylist, smiles):
             smiles = smiles,
             canonical_smiles = canon,
             pg_fingerprint = json.dumps(pg_fingerprint(canon)),
-            # Manually set this using the release version specified in https://github.com/Ramprasad-Group/pgfingerprinting/releases
+            # Manually set this using the release version specified in
+            # https://github.com/Ramprasad-Group/pgfingerprinting/releases
             pg_fingerprint_version = "2.0.0",
-            category = "known"
+            category = polymer_category
         )
+
+
+def save_new_polymers_list(n_poly : db.Frame, outfile):
+    # Sanity check any duplicates.
+    new_polymer_count = n_poly.df.shape[0]
+    unique_smiles_count = len(n_poly.df.smiles.unique())
+    unique_canonical_smiles_count = len(n_poly.canonical_smiles.unique())
+    assert new_polymer_count == unique_smiles_count, "Unique smiles and total polymer len mismatch."
+    assert new_polymer_count == unique_canonical_smiles_count, "Unique canonical smiles and total polymer len mismatch."
+
+    # Save the new polymers lists
+    n_poly.df.to_json(outfile, orient='records', lines=True)
+
 
 
 def prepare_dataset(conn, csv, polylist : db.Frame, shortname : str, *,
@@ -50,22 +64,22 @@ def prepare_dataset(conn, csv, polylist : db.Frame, shortname : str, *,
     Prepare a dataset for insertion into the database.
     Args:
         conn:       Database session object.
-        csv:        Input csv file to load with pandas.
+        csv:        Input csv filepath to load with pandas.
         polylist:   New polymer list, that will be populated.
         shortname:  The short_name of the property in the DB, or None.
-        column_map: A mapping of the common columns in the CSV file.
-        polymer_selection_map: how to select the polymer for this property.
-                    A map of format { db column : csv column, ... }.
+        column_map: A mapping of the columns names between database and CSV file.
+                    Use the format { db column : csv column, ... }
         conditions_map: additional conditions to add to the property row.
                     A map of { key : csv column, ... } where key will be used
-                    in the conditions json.
+                    in the conditions json to store in the database.
         debug :     Enable debug mode, maximum 10 rows will be processed.
 
     Returns:
         A tuple of (
             list of new polymers,
             list of properties for existing polymers,
-            list of properties for new polymers)
+            list of properties for new polymers
+        )
     """
 
     assert "smiles" in column_map, "Column map must specify the 'smiles' field in the CSV."
@@ -117,7 +131,7 @@ def prepare_dataset(conn, csv, polylist : db.Frame, shortname : str, *,
 
         else:
             # Add the item to new polymer list
-            new_polymer(polylist, sml)
+            add_new_polymer(polylist, sml)
 
             # Add the property value to the new polymer property list.
             # Since these polymers will need to be added to the db, we keep
@@ -209,12 +223,4 @@ def prepare(args):
     o_prop.df.to_json(datadir + "/gas_solubility_existing_polymers.jsonl", orient='records', lines=True)
     n_prop.df.to_json(datadir + "/gas_solubility_new_polymers.jsonl", orient='records', lines=True)
 
-    # Sanity check any duplicates.
-    new_polymer_count = n_poly.df.shape[0]
-    unique_smiles_count = len(n_poly.df.smiles.unique())
-    unique_canonical_smiles_count = len(n_poly.canonical_smiles.unique())
-    assert new_polymer_count == unique_smiles_count, "Unique smiles and total polymer len mismatch."
-    assert new_polymer_count == unique_canonical_smiles_count, "Unique canonical smiles and total polymer len mismatch."
-
-    # Save the new polymers lists
-    n_poly.df.to_json(datadir + "/new_polymer_list.jsonl", orient='records', lines=True)
+    save_new_polymers_list(n_poly, datadir + "/new_polymer_list.jsonl")
