@@ -7,6 +7,7 @@ from pyenv_enc import enc
 
 import db
 import prepare as prep
+import test_idempotence as idem
 
 def parse_arguments():
     parser = argparse.ArgumentParser(prog='polylet', description="PolyDB uploader")
@@ -52,6 +53,9 @@ def main():
     if args.command == "prepare":
         args.session = db.connect()
         prep.prepare(args)
+
+    if args.command == "check":
+        idem.check(args)
 
     elif args.command == "upload":
         print("Non implemented!")
