@@ -8,6 +8,7 @@ from pyenv_enc import enc
 import db
 import prepare as prep
 import test_idempotence as idem
+import namelist
 
 def parse_arguments():
     parser = argparse.ArgumentParser(prog='polylet', description="PolyDB uploader")
@@ -15,7 +16,7 @@ def parse_arguments():
     parser.add_argument("command")
 
     parser.add_argument("--loglevel",
-                        default=log.INFO,
+                        default=log.Level.INFO,
                         type=int,
                         help="1-8, higher is more verbose (default 6).")
 
@@ -45,10 +46,6 @@ def main():
 
     if not env:
         log.error("Error - Could not load ENV.")
-    else:
-        if enc.encrypted(os.environ["DB_HOST"]):
-            log.fatal("Error - Could not load ENV - Encrypted.")
-            exit(1)
 
     if args.command == "prepare":
         args.session = db.connect()
@@ -59,6 +56,10 @@ def main():
 
     elif args.command == "upload":
         print("Non implemented!")
+
+    elif args.command == "namelist":
+        args.session = db.connect()
+        namelist.run(args)
 
     else:
         log.error("Unknown command: {}", args.command)
